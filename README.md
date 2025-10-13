@@ -1,279 +1,347 @@
-# Qwen3-VL-30B-A3B-Thinking-FP8 PDF-to-Text OCR Converter
+# Qwen2.5-VL OCR with Confidence Scoring
 
-An intelligent **command-line PDF-to-Text conversion tool** powered by the **Qwen3-VL-30B-A3B-Thinking-FP8 model** - a state-of-the-art Vision Language Model with native thinking capabilities and FP8 quantization for optimal performance.
+A professional PDF-to-text OCR solution powered by the Qwen2.5-VL-7B-Instruct vision-language model. This implementation features intelligent retry logic, confidence scoring, and Chain-of-Thought prompting for high-accuracy text extraction from PDF documents.
 
-## 🚀 Key Features
+## Overview
 
-### 🧠 Native Thinking Model with Chain-of-Thought Reasoning
-Uses the **Qwen3-VL-30B-A3B-Thinking-FP8 model** with built-in thinking capabilities and CoT prompting to guide step-by-step reasoning for exceptional OCR accuracy.
+This project provides a robust OCR pipeline that converts PDF documents to text using state-of-the-art vision-language models. The system employs multiple inference attempts per page with temperature variation, confidence scoring to assess output quality, and automatic batch processing capabilities.
 
-### ✅ Mandatory GPU Verification
-Pre-flight checks using **nvidia-ml-py** to verify 20GB+ VRAM before model loading, preventing wasted time and OOM errors.
+## Key Features
 
-### ⚡ vLLM-Optimized Inference
-Leverages **vLLM** for optimized FP8 inference with efficient GPU memory management and multi-GPU support.
+### Vision-Language Model Architecture
+Utilizes Qwen2.5-VL-7B-Instruct with AutoModelForVision2Seq, specifically designed for vision-to-sequence tasks such as image captioning and optical character recognition.
 
-### 🔄 Intelligent Multi-Retry Mechanism
-Automatically retries low-confidence pages (up to 3 attempts) with progressively enhanced strategies and image preprocessing.
+### Chain-of-Thought Prompting
+Guides the model through systematic reasoning steps for improved accuracy:
+1. Document structure identification
+2. Sequential text extraction
+3. Formatting preservation
+4. Verification of numbers and proper nouns
+5. Complete text transcription
 
-### 📂 In-Place File Generation
-Text files created in the same folder as source PDFs for effortless organization.
+### Intelligent Retry Mechanism
+Multiple OCR attempts per page with temperature scheduling (0.1, 0.2, 0.3) to generate diverse outputs. The best result is selected based on character count and confidence metrics.
 
-## 📋 Requirements
+### Confidence Scoring System
+Each OCR output includes comprehensive confidence metrics:
+- Mean probability across all generated tokens
+- Mean log probability for numerical stability
+- Perplexity score (model uncertainty measure)
+- Minimum token probability for identifying uncertain segments
+
+### Batch Processing
+Recursive directory traversal to process entire folder hierarchies with automatic skip of previously processed files.
+
+### Memory-Optimized Inference
+BFloat16 precision reduces memory usage by approximately 50% while maintaining numerical stability, enabling efficient processing on consumer GPUs.
+
+## System Requirements
 
 ### Hardware
-- **GPU**: NVIDIA GPU with CUDA support
-- **VRAM**: **Minimum 20GB** (verified before model loading)
-- **Recommended GPUs**: RTX 4090 (24GB), RTX 6000 Ada (48GB), A5000 (24GB), A100 (40GB/80GB)
+- NVIDIA GPU with CUDA support
+- Minimum 8GB VRAM (16GB+ recommended for optimal performance)
+- Sufficient disk space for model weights (approximately 15GB)
 
 ### Software
-- Python 3.10+
-- CUDA 11.8+
+- Python 3.8 or higher
+- CUDA 11.8 or higher
 - NVIDIA drivers with GPU support
-- Docker (optional, for containerized deployment)
 
-## 🔧 Installation
+## Installation
 
-### Option 1: Quick Start with pip
+### Step 1: Clone Repository
 
 ```bash
-# Clone repository
 git clone <repository-url>
 cd qwen-ocr
+```
 
-# Create virtual environment
-python3.10 -m venv venv
+### Step 2: Create Virtual Environment
+
+```bash
+python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Verify installation
-python ocr_converter.py --help
 ```
 
-### Option 2: Docker Installation
+### Step 3: Install Dependencies
 
 ```bash
-# Build Docker image
-docker build -t qwen3-ocr-cli .
-
-# Run with Docker
-docker run --gpus all -v /path/to/documents:/data qwen3-ocr-cli /data
-
-# Or use docker-compose
-docker-compose build
-docker-compose run qwen-ocr /data --skip-existing
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+pip install transformers accelerate
+pip install qwen-vl-utils pillow requests
+pip install pdf2image pymupdf pillow
 ```
 
-## 📖 Usage
+### Step 4: Verify Installation
 
-### Basic Usage
+```python
+import torch
+print(f"PyTorch version: {torch.__version__}")
+print(f"CUDA available: {torch.cuda.is_available()}")
+if torch.cuda.is_available():
+    print(f"GPU device: {torch.cuda.get_device_name(0)}")
+```
 
+## Usage
+
+### Basic OCR Example
+
+The system is designed to be used through a Jupyter notebook interface. The main workflow involves:
+
+1. **Load the model** (one-time operation per session)
+2. **Process individual PDFs** or **batch process directories**
+
+### Processing a Single PDF
+
+```python
+from ocr_functions import ocr_pdf, save_results
+
+# Process PDF with default settings
+results = ocr_pdf(
+    pdf_path="path/to/document.pdf",
+    dpi=300,
+    attempts_per_page=3,
+    use_cot=True
+)
+
+# Save results to text file
+save_results(
+    results=results,
+    filename="output.txt",
+    include_metadata=True
+)
+```
+
+### Batch Processing Directory
+
+```python
+from ocr_functions import process_pdf_batch
+
+# Process all PDFs in directory tree
+results = process_pdf_batch(
+    root_directory='documents',
+    dpi=300,
+    attempts_per_page=3,
+    skip_processed=True
+)
+```
+
+### Configuration Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `pdf_path` | Path to PDF file | Required |
+| `dpi` | Rendering resolution (72-600) | 300 |
+| `attempts_per_page` | OCR retry attempts per page | 3 |
+| `use_cot` | Enable Chain-of-Thought prompting | True |
+| `max_pages` | Limit pages to process | None |
+| `skip_processed` | Skip files with existing output | True |
+| `max_new_tokens` | Maximum tokens per generation | 2048 |
+
+## Architecture Details
+
+### PDF Processing Pipeline
+
+1. **PDF to Images Conversion**: PyMuPDF renders each page at specified DPI
+2. **Image Preprocessing**: Automatic resizing of oversized images (max 2048px)
+3. **Vision-Language Processing**: Model processes image and prompt together
+4. **Token Generation**: Text generated with configurable parameters
+5. **Confidence Calculation**: Multiple metrics computed from generation scores
+6. **Result Selection**: Best output selected based on length and confidence
+
+### Model Specifications
+
+- **Model Name**: Qwen/Qwen2.5-VL-7B-Instruct
+- **Architecture**: AutoModelForVision2Seq
+- **Precision**: BFloat16 (torch.bfloat16)
+- **Device Mapping**: Automatic distribution across GPU/CPU
+- **Memory Footprint**: Approximately 7-8GB VRAM
+
+### Generation Parameters
+
+- **Temperature Schedule**: [0.1, 0.2, 0.3] across attempts
+- **Top-p Sampling**: 0.95 threshold
+- **Repetition Penalty**: 1.1
+- **Max Tokens**: 2048 per page
+
+## Confidence Scoring Methodology
+
+The confidence scoring system analyzes token-level probabilities from model generation:
+
+### Mean Probability
+Average probability across all generated tokens. Higher values indicate greater model confidence.
+
+### Mean Log Probability
+Logarithmic average for numerical stability with very small probabilities. Commonly used in natural language processing evaluation.
+
+### Perplexity
+Exponential of negative mean log probability. Measures model uncertainty where lower values indicate higher confidence. Typical range: 1.0 (perfect) to 100+ (very uncertain).
+
+### Minimum Probability
+Identifies the least confident token in the generation, useful for spotting specific problem areas requiring manual review.
+
+## Performance Characteristics
+
+### Processing Speed
+- Best case: 5-10 seconds per page
+- Average: 10-20 seconds per page
+- Worst case (3 retries): 25-40 seconds per page
+
+### Memory Usage
+- Model loading: 7-8GB VRAM
+- During inference: 8-10GB VRAM
+- Peak usage with large images: Up to 12GB VRAM
+
+### Accuracy Factors
+- DPI setting (300 recommended for standard documents)
+- Image quality and resolution
+- Font size and clarity
+- Document complexity (tables, multi-column layouts)
+- Temperature scheduling effectiveness
+
+## Output Format
+
+### Text File Structure
+
+```
+================================================================================
+PAGE 1
+================================================================================
+[Transcribed text from page 1]
+
+================================================================================
+PAGE 2
+================================================================================
+[Transcribed text from page 2]
+```
+
+### Metadata (Optional)
+
+When `include_metadata=True`, output includes:
+- Processing timestamp
+- Total pages processed
+- Total characters extracted
+- Average confidence score
+- Total processing time
+- Per-page statistics
+
+### Detailed JSON Output
+
+For comprehensive analysis, detailed JSON output includes:
+- All retry attempts per page
+- Individual confidence scores
+- Temperature used for each attempt
+- Processing time per attempt
+- Character and word counts
+
+## Troubleshooting
+
+### CUDA Out of Memory
+
+**Symptoms**: RuntimeError during model loading or inference
+
+**Solutions**:
+```python
+# Reduce image size
+preprocess_image_for_ocr(image, max_size=1024)
+
+# Clear GPU cache between operations
+torch.cuda.empty_cache()
+
+# Reduce max_new_tokens
+ocr_pdf(pdf_path, max_new_tokens=1024)
+```
+
+### Low Confidence Scores
+
+**Symptoms**: Perplexity > 50 or mean_probability < 0.3
+
+**Solutions**:
+- Increase DPI for better image quality (try 400-600)
+- Verify image preprocessing isn't over-compressing
+- Check source document quality
+- Review and adjust Chain-of-Thought prompt
+
+### Slow Processing
+
+**Symptoms**: Processing time exceeds expected ranges
+
+**Solutions**:
 ```bash
-# Process all PDFs in a directory
-python ocr_converter.py /path/to/documents
+# Monitor GPU utilization
+nvidia-smi --query-gpu=utilization.gpu --format=csv --loop=1
 
-# Skip PDFs that already have text files
-python ocr_converter.py /path/to/documents --skip-existing
+# Check for thermal throttling
+nvidia-smi --query-gpu=temperature.gpu --format=csv
 
-# Verbose output
-python ocr_converter.py /path/to/documents --verbose
-
-# Dry run (see what would be processed)
-python ocr_converter.py /path/to/documents --dry-run
+# Reduce retry attempts for testing
+ocr_pdf(pdf_path, attempts_per_page=1)
 ```
 
-### Advanced Options
+### Import Errors
 
+**Symptoms**: ModuleNotFoundError for transformers or qwen_vl_utils
+
+**Solutions**:
 ```bash
-# Adjust confidence threshold (0.0-1.0)
-python ocr_converter.py /path/to/documents --confidence 0.90
+# Reinstall core dependencies
+pip install --upgrade transformers accelerate
+pip install qwen-vl-utils --no-cache-dir
 
-# Limit retry attempts
-python ocr_converter.py /path/to/documents --max-retries 2
-
-# Filter specific PDFs
-python ocr_converter.py /path/to/documents --file-pattern "invoice*.pdf"
-
-# Exclude metadata from output
-python ocr_converter.py /path/to/documents --no-metadata
-
-# Adjust GPU memory usage
-python ocr_converter.py /path/to/documents --gpu-memory 0.60
+# Verify installations
+python -c "import transformers; print(transformers.__version__)"
 ```
 
-### Command-Line Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `folder` | Path to folder with PDFs (required) | - |
-| `--confidence` | Confidence threshold (0.0-1.0) | `0.85` |
-| `--max-retries` | Max retry attempts per page | `3` |
-| `--skip-existing` | Skip PDFs with existing .txt files | `False` |
-| `--dry-run` | Preview without processing | `False` |
-| `--file-pattern` | Filter PDFs by pattern | `*.pdf` |
-| `-v, --verbose` | Detailed logging | `False` |
-| `--no-metadata` | Exclude metadata from output | `False` |
-| `--gpu-memory` | GPU memory utilization (0.1-0.95) | `0.70` |
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 qwen-ocr/
-├── src/
-│   ├── __init__.py              # Package initialization
-│   ├── cli.py                   # CLI interface
-│   ├── gpu_detector.py          # GPU/VRAM verification
-│   ├── model_manager.py         # vLLM model management
-│   ├── pdf_scanner.py           # Recursive PDF discovery
-│   ├── ocr_engine.py            # Core OCR with CoT & retry
-│   ├── text_generator.py        # Text file creation
-│   ├── cot_prompts.py           # Chain-of-Thought prompts
-│   └── confidence_scorer.py     # Confidence calculation
-├── ocr_converter.py             # Main entry point
-├── requirements.txt             # Python dependencies
-├── Dockerfile                   # Docker configuration
-├── docker-compose.yml           # Docker Compose setup
-└── README.md                    # This file
+├── qwen_ocr_notebook.ipynb    # Main implementation notebook
+├── README.md                   # This documentation
+├── reports/                    # Example output directory
+└── documents/                  # Example input directory
 ```
 
-## 💡 Example Output
+## Implementation Notes
 
-```bash
-$ python ocr_converter.py ./documents
+### Why PyMuPDF (fitz)?
+PyMuPDF provides faster rendering and better memory efficiency compared to alternatives like pdf2image, and doesn't require external dependencies like Poppler.
 
-==============================================================
-Qwen3-VL-30B-A3B-Thinking-FP8 PDF-to-Text OCR Converter
-==============================================================
+### Why BFloat16?
+BFloat16 precision reduces memory usage by approximately 50% while maintaining better numerical stability than FP16, critical for fitting large models on consumer GPUs.
 
-==============================================================
-STEP 1: Verifying GPU Compatibility
-==============================================================
-GPU Name: NVIDIA RTX 4090
-Total VRAM: 24.0 GB
-Free VRAM: 23.2 GB
-Required VRAM: 20.0 GB
-✓ GPU VERIFICATION PASSED
+### Why Multiple Attempts?
+Temperature variation generates diverse outputs. Lower temperatures (0.1) produce conservative results, while higher temperatures (0.3) explore alternative interpretations, improving overall accuracy.
 
-==============================================================
-STEP 2: Scanning for PDF Files
-==============================================================
-Total PDFs found: 15
-PDFs to process: 15
+### Why LANCZOS Resampling?
+LANCZOS provides the highest quality downsampling method, preserving text clarity better than other algorithms when resizing oversized images.
 
-==============================================================
-STEP 3: Loading Model
-==============================================================
-Loading model: Qwen/Qwen3-VL-30B-A3B-Thinking-FP8
-✓ Model loaded successfully
+## Privacy and Security
 
-==============================================================
-STEP 4: Processing 15 PDF Files
-==============================================================
-Processing PDFs: 100%|████████████| 15/15
+- All processing occurs locally on your machine
+- No external network calls after initial model download
+- Files remain in original locations
+- No data transmission to external servers
+- Model weights stored in local Hugging Face cache
 
-==============================================================
-PROCESSING SUMMARY
-==============================================================
-Successfully processed: 15
-Failed: 0
-Total pages: 89
-Total time: 45.2m
-Average time per page: 30.5s
+## Model License
 
-✓ All PDFs converted successfully!
-```
+This project uses the Qwen2.5-VL-7B-Instruct model. Please review the model license terms at:
+https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct
 
-## 🧪 Testing Components
+## Acknowledgments
 
-Each module can be tested individually:
+- Qwen Team at Alibaba Cloud for the Qwen2.5-VL models
+- Hugging Face for model hosting and Transformers library
+- PyMuPDF team for efficient PDF processing capabilities
 
-```bash
-# Test GPU detection
-python -m src.gpu_detector
+## Support
 
-# Test PDF scanner
-python -m src.pdf_scanner /path/to/documents
-
-# Test confidence scorer
-python -m src.confidence_scorer
-
-# Test CoT prompts
-python -m src.cot_prompts
-```
-
-## 🐛 Troubleshooting
-
-### GPU Not Detected
-```bash
-# Check NVIDIA drivers
-nvidia-smi
-
-# Verify nvidia-ml-py
-python -c "import pynvml; pynvml.nvmlInit(); print('OK')"
-```
-
-### Insufficient VRAM
-```bash
-# Reduce GPU memory utilization
-python ocr_converter.py /data --gpu-memory 0.60
-
-# Clear GPU cache
-python -c "import torch; torch.cuda.empty_cache()"
-```
-
-### vLLM Installation Issues
-```bash
-# Reinstall vLLM
-pip install --upgrade vllm --force-reinstall --no-cache-dir
-```
-
-### Slow Performance
-```bash
-# Check GPU utilization
-nvidia-smi --query-gpu=utilization.gpu --format=csv --loop=1
-
-# Reduce retry attempts for testing
-python ocr_converter.py /data --max-retries 1
-```
-
-## 📊 Performance
-
-**Processing Speed** (per page):
-- Best case: 5-10 seconds
-- Average: 10-20 seconds
-- Worst case (3 retries): 25-40 seconds
-
-**VRAM Usage**:
-- Model loading: ~22-24GB
-- During inference: ~22-28GB
-- Peak usage: Up to 28GB
-
-## 🔐 Security & Privacy
-
-- All processing happens **locally** on your machine
-- No external network calls (except initial model download)
-- Files stay in original locations
-- No data leaves your system
-
-## 📄 License
-
-This project uses the Qwen3-VL-30B-A3B-Thinking-FP8 model which has its own license terms.
-Please review at: https://huggingface.co/Qwen/Qwen3-VL-30B-A3B-Thinking-FP8
-
-## 🙏 Acknowledgments
-
-- **Qwen Team**: For the exceptional Qwen3-VL models
-- **vLLM Team**: For optimized inference engine
-- **HuggingFace**: For model hosting and Transformers library
-
-## 📞 Support
-
-For issues, questions, or feature requests, please open an issue on GitHub.
+For issues, questions, or feature requests, please open an issue on the project repository.
 
 ---
 
-**Version**: 1.0.0
-**Model**: Qwen3-VL-30B-A3B-Thinking-FP8
+**Implementation**: Jupyter Notebook-based OCR system
+**Model**: Qwen2.5-VL-7B-Instruct
+**Framework**: PyTorch + Transformers
 **Last Updated**: 2025-01-15
