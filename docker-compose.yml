@@ -1,0 +1,43 @@
+services:
+  qwen-ocr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qwen3-ocr-cli:latest
+    container_name: qwen-ocr-converter
+
+    # GPU configuration
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    # Environment variables
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - GPU_MEMORY_FRACTION=0.70
+      - CONFIDENCE_THRESHOLD=0.85
+      - MAX_RETRIES=3
+
+    # Mount volumes
+    volumes:
+      # Mount your documents directory
+      - ./documents:/data
+      # Mount cache for model downloads
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      # Mount logs
+      - ./logs:/app/logs
+
+    # Default command (override as needed)
+    command: /data --verbose
+
+    # Restart policy
+    restart: "no"
+
+# Example usage:
+# 1. Build: docker-compose build
+# 2. Run: docker-compose run qwen-ocr /data --skip-existing
+# 3. Custom: docker-compose run qwen-ocr /data --confidence 0.90 --max-retries 2
