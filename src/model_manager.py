@@ -62,7 +62,7 @@ class ModelManager:
                 gpu_memory_utilization=self.gpu_memory_utilization,
                 tensor_parallel_size=self.tensor_parallel_size,
                 trust_remote_code=True,
-                max_model_len=8192,  # Adjust based on your needs
+                max_model_len=4096,  # Reduced for better memory fit (was 8192)
                 dtype="auto",  # Auto-detect dtype (FP8)
             )
             print("✓ Model loaded successfully")

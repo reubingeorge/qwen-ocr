@@ -21,6 +21,7 @@ services:
       - GPU_MEMORY_FRACTION=0.70
       - CONFIDENCE_THRESHOLD=0.85
       - MAX_RETRIES=3
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
     # Mount volumes
     volumes:
