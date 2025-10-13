@@ -1,0 +1,31 @@
+
+# Core ML Framework
+torch>=2.8.0
+torchvision>=0.23.0
+
+# Transformers and Model Support
+transformers>=4.57.0
+accelerate>=1.10.1
+qwen-vl-utils>=0.0.14
+
+# Image Processing
+Pillow>=11.3.0
+opencv-python>=4.12.0.88
+pdf2image>=1.17.0
+PyMuPDF>=1.26.5
+
+# CLI and Progress
+click>=8.3.0
+tqdm>=4.67.1
+colorama>=0.4.6
+
+# Utilities
+python-dotenv>=1.1.1
+pyyaml>=6.0.3
+
+# GPU Support
+nvidia-ml-py>=13.580.82
+
+# Testing (optional)
+pytest>=8.3.0
+pytest-cov>=6.0.0
