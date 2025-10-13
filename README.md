@@ -39,7 +39,7 @@ BFloat16 precision reduces memory usage by approximately 50% while maintaining n
 
 ### Hardware
 - NVIDIA GPU with CUDA support
-- Minimum 8GB VRAM (16GB+ recommended for optimal performance)
+- Minimum 24GB VRAM required
 - Sufficient disk space for model weights (approximately 15GB)
 
 ### Software
@@ -155,7 +155,7 @@ results = process_pdf_batch(
 - **Architecture**: AutoModelForVision2Seq
 - **Precision**: BFloat16 (torch.bfloat16)
 - **Device Mapping**: Automatic distribution across GPU/CPU
-- **Memory Footprint**: Approximately 7-8GB VRAM
+- **Memory Footprint**: Approximately 20-24GB VRAM
 
 ### Generation Parameters
 
@@ -188,9 +188,9 @@ Identifies the least confident token in the generation, useful for spotting spec
 - Worst case (3 retries): 25-40 seconds per page
 
 ### Memory Usage
-- Model loading: 7-8GB VRAM
-- During inference: 8-10GB VRAM
-- Peak usage with large images: Up to 12GB VRAM
+- Model loading: 20-22GB VRAM
+- During inference: 22-24GB VRAM
+- Peak usage with large images: Up to 24GB VRAM
 
 ### Accuracy Factors
 - DPI setting (300 recommended for standard documents)
