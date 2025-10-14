@@ -20,14 +20,14 @@ Guides the model through systematic reasoning steps for improved accuracy:
 5. Complete text transcription
 
 ### Intelligent Retry Mechanism
-Multiple OCR attempts per page with temperature scheduling (0.1, 0.2, 0.3) to generate diverse outputs. The best result is selected based on character count and confidence metrics.
+Multiple OCR attempts per page with temperature scheduling (0.1, 0.2, 0.3) to generate diverse outputs. The best result is selected using medical-grade quality scoring that prioritizes accuracy over completeness.
 
-### Confidence Scoring System
-Each OCR output includes comprehensive confidence metrics:
-- Mean probability across all generated tokens
-- Mean log probability for numerical stability
-- Perplexity score (model uncertainty measure)
-- Minimum token probability for identifying uncertain segments
+### Medical-Grade Quality Gating
+Optimized for medical pathology reports where accuracy is critical:
+- Perplexity-based quality scoring (80% weight on accuracy, 20% on completeness)
+- Automatic quality warnings for low-confidence outputs
+- Detection of uncertain tokens and inconsistent attempts
+- Conservative temperature bias to prevent hallucinations
 
 ### Batch Processing
 Recursive directory traversal to process entire folder hierarchies with automatic skip of previously processed files.
@@ -147,7 +147,8 @@ results = process_pdf_batch(
 3. **Vision-Language Processing**: Model processes image and prompt together
 4. **Token Generation**: Text generated with configurable parameters
 5. **Confidence Calculation**: Multiple metrics computed from generation scores
-6. **Result Selection**: Best output selected based on length and confidence
+6. **Medical-Grade Selection**: Best output selected using composite quality score
+7. **Quality Gating**: Automatic flagging of pages requiring manual review
 
 ### Model Specifications
 
@@ -164,21 +165,47 @@ results = process_pdf_batch(
 - **Repetition Penalty**: 1.1
 - **Max Tokens**: 2048 per page
 
-## Confidence Scoring Methodology
+## Medical-Grade OCR Selection Strategy
 
-The confidence scoring system analyzes token-level probabilities from model generation:
+This implementation is optimized for medical pathology reports where accuracy is paramount. The selection strategy heavily weights quality over completeness to prevent hallucinations or misreads that could impact clinical decision-making.
 
-### Mean Probability
-Average probability across all generated tokens. Higher values indicate greater model confidence.
+### Composite Quality Score
 
-### Mean Log Probability
-Logarithmic average for numerical stability with very small probabilities. Commonly used in natural language processing evaluation.
+The system calculates a composite score for each OCR attempt combining multiple factors:
 
-### Perplexity
-Exponential of negative mean log probability. Measures model uncertainty where lower values indicate higher confidence. Typical range: 1.0 (perfect) to 100+ (very uncertain).
+**Quality Component (80% weight)**:
+- Perplexity-based scoring converted to 0-1 scale
+- Lower perplexity indicates higher model confidence
+- Typical range: 1.0 (perfect) to 100+ (very uncertain)
 
-### Minimum Probability
-Identifies the least confident token in the generation, useful for spotting specific problem areas requiring manual review.
+**Completeness Component (20% weight)**:
+- Normalized character count relative to expected page length
+- Ensures output is reasonably complete while prioritizing accuracy
+
+**Penalty Factors**:
+- Minimum token probability penalty (30% reduction if min_prob < 0.05)
+- Temperature bias (5% penalty for temperatures > 0.1)
+- Favors conservative, high-confidence outputs
+
+### Quality Gating Thresholds
+
+Pages are automatically flagged for manual review when:
+- Composite quality score < 0.5
+- Perplexity > 20.0 (high uncertainty)
+- Minimum token probability < 0.05 (very uncertain tokens detected)
+- Coefficient of variation > 30% across attempts (inconsistent results)
+
+### Confidence Metrics
+
+Each OCR output includes comprehensive confidence metrics:
+
+**Mean Probability**: Average probability across all generated tokens (0-1 scale)
+
+**Mean Log Probability**: Logarithmic average for numerical stability with very small probabilities
+
+**Perplexity**: Exponential of negative mean log probability measuring model uncertainty
+
+**Minimum Probability**: Identifies the least confident token for spotting potential errors
 
 ## Performance Characteristics
 
@@ -304,6 +331,12 @@ qwen-ocr/
 
 ## Implementation Notes
 
+### Why Medical-Grade Quality Gating?
+For pathology reports, a single misread value (tumor size, staging, biomarker status) can impact treatment decisions. The 80/20 quality-to-completeness weighting ensures accuracy takes precedence over extracting every word. Better to flag a page for manual review than risk introducing hallucinated data into medical records.
+
+### Why Perplexity Over Mean Probability?
+Perplexity is more sensitive to outlier tokens and provides better theoretical grounding for uncertainty quantification. A single very low-probability token (potential hallucination) affects perplexity more than mean probability, making it superior for detecting problematic outputs in critical applications.
+
 ### Why PyMuPDF (fitz)?
 PyMuPDF provides faster rendering and better memory efficiency compared to alternatives like pdf2image, and doesn't require external dependencies like Poppler.
 
@@ -311,7 +344,7 @@ PyMuPDF provides faster rendering and better memory efficiency compared to alter
 BFloat16 precision reduces memory usage by approximately 50% while maintaining better numerical stability than FP16, critical for fitting large models on consumer GPUs.
 
 ### Why Multiple Attempts?
-Temperature variation generates diverse outputs. Lower temperatures (0.1) produce conservative results, while higher temperatures (0.3) explore alternative interpretations, improving overall accuracy.
+Temperature variation generates diverse outputs. Lower temperatures (0.1) produce conservative results, while higher temperatures (0.3) explore alternative interpretations. The medical-grade selector chooses the highest quality attempt, not just the longest.
 
 ### Why LANCZOS Resampling?
 LANCZOS provides the highest quality downsampling method, preserving text clarity better than other algorithms when resizing oversized images.
