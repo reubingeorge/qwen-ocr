@@ -1,5 +1,12 @@
 # Qwen2.5-VL OCR with Confidence Scoring
 
+![Python](https://img.shields.io/badge/python-3.8%2B-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-red)
+![CUDA](https://img.shields.io/badge/CUDA-11.8%2B-green)
+![Transformers](https://img.shields.io/badge/Transformers-latest-orange)
+![VRAM](https://img.shields.io/badge/VRAM-24GB-yellow)
+![License](https://img.shields.io/badge/license-Model%20Dependent-lightgrey)
+
 A professional PDF-to-text OCR solution powered by the Qwen2.5-VL-7B-Instruct vision-language model. This implementation features intelligent retry logic, confidence scoring, and Chain-of-Thought prompting for high-accuracy text extraction from PDF documents.
 
 ## Overview
